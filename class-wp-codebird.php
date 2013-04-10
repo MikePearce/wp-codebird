@@ -187,7 +187,7 @@ class WP_Codebird extends Codebird {
             if ( 200 == $httpstatus )
                 self::setBearerToken( $reply->access_token );
         } else {
-            $reply['httpstatus'] = $httpstatus;å
+            $reply['httpstatus'] = $httpstatus;
 
             if ( 200 == $httpstatus )
                 self::setBearerToken( $reply['access_token'] );
