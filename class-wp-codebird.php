@@ -49,33 +49,35 @@ class WP_Codebird extends Codebird {
 	 * Calls the API using Wordpress' HTTP API.
 	 *
 	 * @since 0.1.0
-	 * @see Codebird::_callApi
-	 * @param string          $httpmethod      The HTTP method to use for making the request
-	 * @param string          $method          The API method to call
-	 * @param string          $method_template The templated API method to call
-	 * @param array           $params          The parameters to send along (optional)
-	 * @param bool            $multipart       Whether to use multipart/form-data (optional)
-	 * @param bool		      $app_only_auth
-	 * @throws Exception						If something goes awry with auth or the reply
+	 * @see   Codebird::_callApi
+	 *
+	 * @param string $httpmethod      The HTTP method to use for making the request
+	 * @param string $method          The API method to call
+	 * @param string $method_template The templated API method to call
+	 * @param array  $params          The parameters to send along (optional)
+	 * @param bool   $multipart       Whether to use multipart/form-data (optional)
+	 * @param bool   $app_only_auth
+	 *
+	 * @throws Exception                        If something goes awry with auth or the reply
 	 *
 	 * @return mixed The API reply, encoded in the set return_format.
 	 */
 	protected function _callApi( $httpmethod, $method, $method_template, $params = array(), $multipart = false, $app_only_auth = false ) {
 
-		$url 				= $this->_getEndpoint( $method, $method_template );
-		$url_with_params 	= null;
-		$authorization 		= null;
+		$url             = $this->_getEndpoint( $method, $method_template );
+		$url_with_params = null;
+		$authorization   = null;
 
 		$remote_params = array(
-			'method' => $httpmethod,
-			'timeout' => 5,
+			'method'      => $httpmethod,
+			'timeout'     => 5,
 			'redirection' => 5,
 			'httpversion' => '1.0',
-			'blocking' => true,
-			'headers' => array(),
-			'body' => null,
-			'cookies' => array(),
-			'sslverify' => false
+			'blocking'    => true,
+			'headers'     => array(),
+			'body'        => null,
+			'cookies'     => array(),
+			'sslverify'   => false
 		);
 
 		if ( 'GET' == $httpmethod ) {
@@ -87,33 +89,37 @@ class WP_Codebird extends Codebird {
 			$authorization = $this->_sign( $httpmethod, $url, $params );
 
 			$url = $url_with_params;
-		} else {
-			if ($multipart) {
-				$authorization = $this->_sign($httpmethod, $url, array());
-				$params        = $this->_buildMultipart($method_template, $params);
+		}
+		else {
+			if ( $multipart ) {
+				$authorization = $this->_sign( $httpmethod, $url, array() );
+				$params        = $this->_buildMultipart( $method_template, $params );
 
 				// Add the boundaries
 				// For the same reason we strip "Authorisation: " below. WP_HTTP_API uses the array key to know what the
 				// header is and Codebird uses a string.
-				$first_newline      = strpos($params, "\r\n");
-				$multipart_boundary = substr($params, 2, $first_newline - 2);
-				$remote_params['headers']['Content-Length']  = strlen($params);
-				$remote_params['headers']['Content-Type']  = 'multipart/form-data; boundary='. $multipart_boundary;
+				$first_newline                              = strpos( $params, "\r\n" );
+				$multipart_boundary                         = substr( $params, 2, $first_newline - 2 );
+				$remote_params['headers']['Content-Length'] = strlen( $params );
+				$remote_params['headers']['Content-Type']   = 'multipart/form-data; boundary=' . $multipart_boundary;
 
-			} else {
-				$authorization = $this->_sign($httpmethod, $url, $params);
-				$params        = http_build_query($params);
+			}
+			else {
+				$authorization = $this->_sign( $httpmethod, $url, $params );
+				$params        = http_build_query( $params );
 			}
 			$remote_params['body'] = $params;
 		}
 
-		if ( $app_only_auth ){
-			if ( null == self::$_oauth_consumer_key )
+		if ( $app_only_auth ) {
+			if ( null == self::$_oauth_consumer_key ) {
 				throw new Exception( 'To make an app-only auth API request, the consumer key must be set' );
+			}
 
 			// automatically fetch bearer token, if necessary
-			if ( null == self::$_oauth_bearer_token )
+			if ( null == self::$_oauth_bearer_token ) {
 				$this->oauth2_token();
+			}
 
 			$authorization = 'Authorization: Bearer ' . self::$_oauth_bearer_token;
 		}
@@ -122,30 +128,34 @@ class WP_Codebird extends Codebird {
 		$authorization = trim( str_replace( 'Authorization:', '', $authorization ) );
 
 		if ( $authorization ) {
-			$remote_params['headers']['Authorization'] 	= $authorization;
-			$remote_params['headers']['Expect'] 		= '';
+			$remote_params['headers']['Authorization'] = $authorization;
+			$remote_params['headers']['Expect']        = '';
 		}
 
 		if ( 'GET' == $httpmethod ) {
 			$reply = wp_remote_get( $url, $remote_params );
-		} else {
+		}
+		else {
 			$reply = wp_remote_post( $url, $remote_params );
 		}
 
 		if ( isset( $reply ) ) {
 			if ( is_wp_error( $reply ) ) {
 				throw new Exception( $reply->get_error_message() );
-			} else {
-				$httpstatus = $reply[ 'response' ][ 'code' ];
-				$reply = $this->_parseApiReply( $method_template, $reply );
+			}
+			else {
+				$httpstatus = $reply['response']['code'];
+				$reply      = $this->_parseApiReply( $method_template, $reply );
 
 				if ( $this->_return_format == CODEBIRD_RETURNFORMAT_OBJECT ) {
 					$reply->httpstatus = $httpstatus;
-				} else {
-					$reply[ 'httpstatus' ] = $httpstatus;
+				}
+				else {
+					$reply['httpstatus'] = $httpstatus;
 				}
 			}
-		} else {
+		}
+		else {
 			throw new Exception( 'A reply was never generated. Some has gone horribly awry.' );
 		}
 
@@ -164,7 +174,7 @@ class WP_Codebird extends Codebird {
 
 	public function oauth2_token() {
 		if ( null == self::$_oauth_consumer_key ) {
-			throw new Exception('To obtain a bearer token, the consumer key must be set.');
+			throw new Exception( 'To obtain a bearer token, the consumer key must be set.' );
 		}
 
 		$post_fields = array(
@@ -175,37 +185,40 @@ class WP_Codebird extends Codebird {
 
 		$headers = array(
 			'Authorization' => 'Basic ' . base64_encode( self::$_oauth_consumer_key . ':' . self::$_oauth_consumer_secret ),
-			'Expect'		=> ''
+			'Expect'        => ''
 		);
 
 		$remote_params = array(
-			'method' 		=> 'POST',
-			'timeout' 		=> 5,
-			'redirection' 	=> 5,
-			'httpversion' 	=> '1.0',
-			'blocking' 		=> true,
-			'headers' 		=> $headers,
-			'body' 			=> $post_fields,
-			'cookies' 		=> array(),
-			'sslverify' 	=> false
+			'method'      => 'POST',
+			'timeout'     => 5,
+			'redirection' => 5,
+			'httpversion' => '1.0',
+			'blocking'    => true,
+			'headers'     => $headers,
+			'body'        => $post_fields,
+			'cookies'     => array(),
+			'sslverify'   => false
 		);
 
-		$reply 		= wp_remote_post( $url, $remote_params );
+		$reply = wp_remote_post( $url, $remote_params );
 
 		$httpstatus = wp_remote_retrieve_response_code( $reply );
 
-		$reply 		= $this->_parseApiReply( 'oauth2/token', $reply );
+		$reply = $this->_parseApiReply( 'oauth2/token', $reply );
 
 		if ( CODEBIRD_RETURNFORMAT_OBJECT == $this->_return_format ) {
 			$reply->httpstatus = $httpstatus;
 
-			if ( 200 == $httpstatus )
+			if ( 200 == $httpstatus ) {
 				self::setBearerToken( $reply->access_token );
-		} else {
+			}
+		}
+		else {
 			$reply['httpstatus'] = $httpstatus;
 
-			if ( 200 == $httpstatus )
+			if ( 200 == $httpstatus ) {
 				self::setBearerToken( $reply['access_token'] );
+			}
 		}
 
 		return $reply;
@@ -215,7 +228,8 @@ class WP_Codebird extends Codebird {
 	 * Parses the API reply to encode it in the set return_format.
 	 *
 	 * @since 0.1.0
-	 * @see Codebird::_parseApiReply
+	 * @see   Codebird::_parseApiReply
+	 *
 	 * @param string $method The method that has been called
 	 * @param string $reply  The actual reply, JSON-encoded or URL-encoded
 	 *
@@ -224,11 +238,11 @@ class WP_Codebird extends Codebird {
 	protected function _parseApiReply( $method, $reply ) {
 		// split headers and body
 		$http_response = $reply;
-		$headers = $http_response[ 'headers' ];
+		$headers       = $http_response['headers'];
 
 		$reply = '';
-		if ( isset( $http_response[ 'body' ] ) ) {
-			$reply = $http_response[ 'body' ];
+		if ( isset( $http_response['body'] ) ) {
+			$reply = $http_response['body'];
 		}
 
 		$need_array = $this->_return_format == CODEBIRD_RETURNFORMAT_ARRAY;
@@ -239,25 +253,28 @@ class WP_Codebird extends Codebird {
 		$parsed = array();
 		if ( $method == 'users/profile_image/:screen_name' ) {
 			// this method returns a 302 redirect, we need to extract the URL
-			if ( isset( $headers[ 'Location' ] ) ) {
-				$parsed = array( 'profile_image_url_https' => $headers[ 'Location' ] );
+			if ( isset( $headers['Location'] ) ) {
+				$parsed = array( 'profile_image_url_https' => $headers['Location'] );
 			}
-		} elseif ( !$parsed = json_decode( $reply, $need_array ) ) {
+		}
+		elseif ( ! $parsed = json_decode( $reply, $need_array ) ) {
 			if ( $reply ) {
 				$reply = explode( '&', $reply );
 				foreach ( $reply as $element ) {
 					if ( stristr( $element, '=' ) ) {
 						list( $key, $value ) = explode( '=', $element );
-						$parsed[ $key ] = $value;
-					} else {
-						$parsed[ 'message' ] = $element;
+						$parsed[$key] = $value;
+					}
+					else {
+						$parsed['message'] = $element;
 					}
 				}
 			}
 		}
-		if ( !$need_array ) {
+		if ( ! $need_array ) {
 			$parsed = ( object ) $parsed;
 		}
+
 		return $parsed;
 	}
 
@@ -265,43 +282,42 @@ class WP_Codebird extends Codebird {
 	 * Detect filenames in upload parameters,
 	 * build multipart request from upload params
 	 *
-	 * @param string $method  The API method to call
-	 * @param array  $params  The parameters to send along
+	 * @param string $method The API method to call
+	 * @param array  $params The parameters to send along
 	 *
 	 * @throws Exception
 	 *
 	 * @return void
 	 */
-	protected function _buildMultipart($method, $params)
-	{
+	protected function _buildMultipart( $method, $params ) {
 		// well, files will only work in multipart methods
-		if (! $this->_detectMultipart($method)) {
+		if ( ! $this->_detectMultipart( $method ) ) {
 			return;
 		}
 
 		// only check specific parameters
 		$possible_files = array(
 			// Tweets
-			'statuses/update_with_media' => 'media[]',
+			'statuses/update_with_media'              => 'media[]',
 			// Accounts
 			'account/update_profile_background_image' => 'image',
-			'account/update_profile_image' => 'image',
-			'account/update_profile_banner' => 'banner'
+			'account/update_profile_image'            => 'image',
+			'account/update_profile_banner'           => 'banner'
 		);
 		// method might have files?
-		if (! in_array($method, array_keys($possible_files))) {
+		if ( ! in_array( $method, array_keys( $possible_files ) ) ) {
 			return;
 		}
 
-		$possible_files = explode(' ', $possible_files[$method]);
+		$possible_files = explode( ' ', $possible_files[$method] );
 
-		$multipart_border = '--------------------' . $this->_nonce();
+		$multipart_border  = '--------------------' . $this->_nonce();
 		$multipart_request = '';
 
-		foreach ($params as $key => $value) {
+		foreach ( $params as $key => $value ) {
 			// is it an array?
-			if (is_array($value)) {
-				throw new \Exception('Using URL-encoded parameters is not supported for uploading media.');
+			if ( is_array( $value ) ) {
+				throw new \Exception( 'Using URL-encoded parameters is not supported for uploading media.' );
 				continue;
 			}
 			$multipart_request .=
@@ -309,23 +325,23 @@ class WP_Codebird extends Codebird {
 				. 'Content-Disposition: form-data; name="' . $key . '"';
 
 			// check for filenames
-			if (in_array($key, $possible_files)) {
-				if (// is it a file, a readable one?
-				@file_exists($value)
-				 && @is_readable($value)
+			if ( in_array( $key, $possible_files ) ) {
+				if ( // is it a file, a readable one?
+				@file_exists( $value )
+				 && @is_readable( $value )
 
 					 // is it a valid image?
-					 && $data = @getimagesize($value)
+					 && $data = @getimagesize( $value )
 				) {
-					if (// is it a supported image format?
-					in_array($data[2], $this->_supported_media_files)
+					if ( // is it a supported image format?
+					in_array( $data[2], $this->_supported_media_files )
 					) {
 						// try to read the file
 						ob_start();
-						readfile($value);
+						readfile( $value );
 						$data = ob_get_contents();
 						ob_end_clean();
-						if (strlen($data) == 0) {
+						if ( strlen( $data ) == 0 ) {
 							continue;
 						}
 						$value = $data;
