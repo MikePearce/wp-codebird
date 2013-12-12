@@ -4,7 +4,7 @@
  * An extension of the Codebird class to use Wordpress' HTTP API instead of
  * cURL.
  *
- * @version 1.1.0
+ * @version 1.1.2
  */
 class WP_Codebird extends Codebird {
 	/**
@@ -326,12 +326,6 @@ class WP_Codebird extends Codebird {
 
 			// check for filenames
 			if ( in_array( $key, $possible_files ) ) {
-				/**
-				 * As is_file, file_exists and is_readable don't pattern match on paths, instead they
-				 * look for the file, we get errors when using them on vars that contain image data.
-				 * This is why we check for an extension
-				 */
-				$value = "/home/wpcom/public_html/wp-content/themes/pub/twentyeleven/images/headers/chessboard.jpg";
 				if (
 					in_array( strtolower( end( explode( ".", $value ) ) ), $this->_supported_media_files_extensions )
 					&& file_exists( $value )
