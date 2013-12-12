@@ -4,13 +4,19 @@
  * An extension of the Codebird class to use Wordpress' HTTP API instead of
  * cURL.
  *
- * @version 1.1.1
+ * @version 1.1.0
  */
 class WP_Codebird extends Codebird {
 	/**
 	 * The current singleton instance
 	 */
 	private static $_instance = null;
+
+	/**
+	 * The file formats extensions twitter supports
+	 * @var array
+	 */
+	protected $_supported_media_files_extensions = array( 'gif', 'jpg', 'jpeg', 'png' );
 
 	/**
 	 * Returns singleton class instance
@@ -54,16 +60,12 @@ class WP_Codebird extends Codebird {
 	 * @param string $httpmethod      The HTTP method to use for making the request
 	 * @param string $method          The API method to call
 	 * @param string $method_template The templated API method to call
-	 * @param array  $params          The parameters to send along (optional)
-	 * @param bool   $multipart       Whether to use multipart/form-data (optional)
-	 * @param bool   $app_only_auth
-	 *
-	 * @throws Exception                        If something goes awry with auth or the reply
+	 * @param        array            optional $params          The parameters to send along
+	 * @param        bool             optional $multipart       Whether to use multipart/form-data
 	 *
 	 * @return mixed The API reply, encoded in the set return_format.
 	 */
 	protected function _callApi( $httpmethod, $method, $method_template, $params = array(), $multipart = false, $app_only_auth = false ) {
-
 		$url             = $this->_getEndpoint( $method, $method_template );
 		$url_with_params = null;
 		$authorization   = null;
@@ -96,8 +98,6 @@ class WP_Codebird extends Codebird {
 				$params        = $this->_buildMultipart( $method_template, $params );
 
 				// Add the boundaries
-				// For the same reason we strip "Authorisation: " below. WP_HTTP_API uses the array key to know what the
-				// header is and Codebird uses a string.
 				$first_newline                              = strpos( $params, "\r\n" );
 				$multipart_boundary                         = substr( $params, 2, $first_newline - 2 );
 				$remote_params['headers']['Content-Length'] = strlen( $params );
@@ -166,8 +166,6 @@ class WP_Codebird extends Codebird {
 	 * Gets the OAuth bearer token
 	 *
 	 * Overridden to use the WordPress HTTP API
-	 *
-	 * @throws Exception
 	 *
 	 * @return string The OAuth bearer token
 	 */
@@ -285,8 +283,6 @@ class WP_Codebird extends Codebird {
 	 * @param string $method The API method to call
 	 * @param array  $params The parameters to send along
 	 *
-	 * @throws Exception
-	 *
 	 * @return void
 	 */
 	protected function _buildMultipart( $method, $params ) {
@@ -317,7 +313,11 @@ class WP_Codebird extends Codebird {
 		foreach ( $params as $key => $value ) {
 			// is it an array?
 			if ( is_array( $value ) ) {
-				throw new \Exception( 'Using URL-encoded parameters is not supported for uploading media.' );
+				_doing_it_wrong(
+					'_buildMultiPart()',
+					'Using URL-encoded parameters is not supported for uploading media.',
+					'3.7.1'
+				);
 				continue;
 			}
 			$multipart_request .=
@@ -326,33 +326,29 @@ class WP_Codebird extends Codebird {
 
 			// check for filenames
 			if ( in_array( $key, $possible_files ) ) {
-				if ( // is it a file, a readable one?
-				@file_exists( $value )
-				 && @is_readable( $value )
-
-					 // is it a valid image?
-					 && $data = @getimagesize( $value )
+				/**
+				 * As is_file, file_exists and is_readable don't pattern match on paths, instead they
+				 * look for the file, we get errors when using them on vars that contain image data.
+				 * This is why we check for an extension
+				 */
+				$value = "/home/wpcom/public_html/wp-content/themes/pub/twentyeleven/images/headers/chessboard.jpg";
+				if (
+					in_array( strtolower( end( explode( ".", $value ) ) ), $this->_supported_media_files_extensions )
+					&& file_exists( $value )
+					&& is_readable( $value )
+					&& $data = getimagesize( $value )
 				) {
 					if ( // is it a supported image format?
 					in_array( $data[2], $this->_supported_media_files )
 					) {
 						// try to read the file
-						ob_start();
-						readfile( $value );
-						$data = ob_get_contents();
-						ob_end_clean();
+						$data = file_get_contents( $value );
 						if ( strlen( $data ) == 0 ) {
 							continue;
 						}
 						$value = $data;
 					}
 				}
-
-				/*
-				$multipart_request .=
-					"\r\nContent-Transfer-Encoding: base64";
-				$value = base64_encode($value);
-				*/
 			}
 
 			$multipart_request .=
@@ -362,4 +358,5 @@ class WP_Codebird extends Codebird {
 
 		return $multipart_request;
 	}
+
 }
