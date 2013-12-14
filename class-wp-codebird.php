@@ -113,7 +113,12 @@ class WP_Codebird extends Codebird {
 
 		if ( $app_only_auth ) {
 			if ( null == self::$_oauth_consumer_key ) {
-				throw new Exception( 'To make an app-only auth API request, the consumer key must be set' );
+				_doing_it_wrong(
+					'_callApi()',
+					'To make an app-only auth API request, the consumer key must be set',
+					'3.7.1'
+				);
+				return false;
 			}
 
 			// automatically fetch bearer token, if necessary
@@ -141,7 +146,12 @@ class WP_Codebird extends Codebird {
 
 		if ( isset( $reply ) ) {
 			if ( is_wp_error( $reply ) ) {
-				throw new Exception( $reply->get_error_message() );
+				_doing_it_wrong(
+					'_callApi()',
+					'Message from API: ' . $reply->get_error_message(),
+					'3.7.1'
+				);
+				return false;
 			}
 			else {
 				$httpstatus = $reply['response']['code'];
@@ -156,7 +166,12 @@ class WP_Codebird extends Codebird {
 			}
 		}
 		else {
-			throw new Exception( 'A reply was never generated. Some has gone horribly awry.' );
+			_doing_it_wrong(
+				'_callApi()',
+				'A reply was never generated. Some has gone horribly awry.',
+				'3.7.1'
+			);
+			return false;
 		}
 
 		return $reply;
@@ -172,7 +187,12 @@ class WP_Codebird extends Codebird {
 
 	public function oauth2_token() {
 		if ( null == self::$_oauth_consumer_key ) {
-			throw new Exception( 'To obtain a bearer token, the consumer key must be set.' );
+			_doing_it_wrong(
+				'oauth2_token()',
+				'To obtain a bearer token, the consumer key must be set.',
+				'3.7.1'
+			);
+			return false;
 		}
 
 		$post_fields = array(
