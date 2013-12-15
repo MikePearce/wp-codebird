@@ -4,7 +4,7 @@
  * An extension of the Codebird class to use Wordpress' HTTP API instead of
  * cURL.
  *
- * @version 1.1.2
+ * @version 1.1.3
  */
 class WP_Codebird extends Codebird {
 	/**
@@ -97,11 +97,17 @@ class WP_Codebird extends Codebird {
 				$authorization = $this->_sign( $httpmethod, $url, array() );
 				$params        = $this->_buildMultipart( $method_template, $params );
 
-				// Add the boundaries
-				$first_newline                              = strpos( $params, "\r\n" );
-				$multipart_boundary                         = substr( $params, 2, $first_newline - 2 );
-				$remote_params['headers']['Content-Length'] = strlen( $params );
-				$remote_params['headers']['Content-Type']   = 'multipart/form-data; boundary=' . $multipart_boundary;
+				// Something went wrong with building the multipart, so we should stop.
+				if ( false === $params ) {
+					return false;
+				}
+				else {
+					// Add the boundaries
+					$first_newline                              = strpos( $params, "\r\n" );
+					$multipart_boundary                         = substr( $params, 2, $first_newline - 2 );
+					$remote_params['headers']['Content-Length'] = strlen( $params );
+					$remote_params['headers']['Content-Type']   = 'multipart/form-data; boundary=' . $multipart_boundary;
+				}
 
 			}
 			else {
@@ -346,10 +352,19 @@ class WP_Codebird extends Codebird {
 
 			// check for filenames
 			if ( in_array( $key, $possible_files ) ) {
+
+				// We only want media[] entries which are URLs
+				if( ! filter_var( $value, FILTER_VALIDATE_URL ) ){
+					_doing_it_wrong(
+						'_buildMultiPart()',
+						'Only URLs are allowed. Images stored on a file system cannot be used.',
+						'3.7.1'
+					);
+					return false;
+				}
+
 				if (
 					in_array( strtolower( end( explode( ".", $value ) ) ), $this->_supported_media_files_extensions )
-					&& file_exists( $value )
-					&& is_readable( $value )
 					&& $data = getimagesize( $value )
 				) {
 					if ( // is it a supported image format?
